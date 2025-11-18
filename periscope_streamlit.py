@@ -6,18 +6,23 @@ import matplotlib.pyplot as plt
 # ---------- Geometry helpers ----------
 
 def unit_vector_from_angle(deg: float):
+    """Return a unit vector for an angle in degrees from +x axis (CCW)."""
     rad = math.radians(deg)
     return math.cos(rad), math.sin(rad)
 
 
 def reflect_vector(v, m):
-    """Reflect direction vector v in mirror with direction m."""
+    """Reflect direction vector v across a mirror whose direction is m."""
     vx, vy = v
     mx, my = m
-    nx, ny = -my, mx  # normal
+
+    # normal to mirror
+    nx, ny = -my, mx
     dot = vx * nx + vy * ny
+
     rx = vx - 2 * dot * nx
     ry = vy - 2 * dot * ny
+
     length = math.hypot(rx, ry)
     if length == 0:
         return 0.0, 0.0
@@ -26,8 +31,13 @@ def reflect_vector(v, m):
 
 def intersect_ray_with_segment(p0, v, c, m, length):
     """
-    Ray p0 + s*v  with finite segment centred at c, direction m, length L.
-    Returns (intersection_point, s, t) or None.
+    Intersection between ray p0 + s*v and a finite segment centred at c,
+    with direction m and total length 'length'.
+
+    Returns (point, s, t) or None if no hit:
+      point = (x, y) intersection
+      s = parameter along ray  (>= 0)
+      t = parameter along mirror (|t| <= length/2)
     """
     x0, y0 = p0
     vx, vy = v
@@ -40,7 +50,7 @@ def intersect_ray_with_segment(p0, v, c, m, length):
     # Solve: p0 + s*v = c + t*m
     D = -vx * my + mx * vy
     if abs(D) < 1e-6:
-        return None
+        return None  # nearly parallel
 
     s = (bx * (-my) - (-mx) * by) / D
     t = (vx * by - vy * bx) / D
@@ -56,6 +66,7 @@ def intersect_ray_with_segment(p0, v, c, m, length):
 # ---------- Drawing helpers ----------
 
 def draw_periscope(ax):
+    # Tube rectangle
     tube_left = 350
     tube_right = 450
     tube_bottom = 80
@@ -85,25 +96,29 @@ def draw_mirror(ax, center, m, length, color="blue"):
     cx, cy = center
     half = length / 2.0
     mx, my = m
+
     x1 = cx - half * mx
     y1 = cy - half * my
     x2 = cx + half * mx
     y2 = cy + half * my
+
     ax.plot([x1, x2], [y1, y2], color=color, linewidth=4)
 
 
 def draw_ray_path(ax, top_angle_deg, bottom_angle_deg, entry_height):
     mirror_length = 150
+
     top_center = (400, 450)
     bottom_center = (400, 150)
 
     top_m = unit_vector_from_angle(top_angle_deg)
     bottom_m = unit_vector_from_angle(bottom_angle_deg)
 
+    # incoming ray from left
     ray_start = (100, entry_height)
     ray_dir = (1.0, 0.0)
 
-    # 1) Ray to top mirror
+    # --- 1) to top mirror ---
     hit1 = intersect_ray_with_segment(ray_start, ray_dir, top_center, top_m, mirror_length)
 
     if hit1 is None:
@@ -121,7 +136,7 @@ def draw_ray_path(ax, top_angle_deg, bottom_angle_deg, entry_height):
 
     ray_dir = reflect_vector(ray_dir, top_m)
 
-    # 2) Ray to bottom mirror
+    # --- 2) to bottom mirror ---
     hit2 = intersect_ray_with_segment(p1, ray_dir, bottom_center, bottom_m, mirror_length)
 
     if hit2 is None:
@@ -135,7 +150,7 @@ def draw_ray_path(ax, top_angle_deg, bottom_angle_deg, entry_height):
 
     ray_dir = reflect_vector(ray_dir, bottom_m)
 
-    # 3) Final outgoing ray
+    # --- 3) final outgoing ray ---
     far = (p2[0] + ray_dir[0] * 1000, p2[1] + ray_dir[1] * 1000)
     ax.plot([p2[0], far[0]], [p2[1], far[1]], color="red", linewidth=2)
 
@@ -176,28 +191,33 @@ def main():
             step=5,
         )
 
+    # Create figure
     fig, ax = plt.subplots(figsize=(8, 6))
 
+    # Draw static parts
     draw_periscope(ax)
 
+    # Draw mirrors
     top_center = (400, 450)
     bottom_center = (400, 150)
     mirror_length = 150
-
     top_m = unit_vector_from_angle(top_angle)
     bottom_m = unit_vector_from_angle(bottom_angle)
-
     draw_mirror(ax, top_center, top_m, mirror_length)
     draw_mirror(ax, bottom_center, bottom_m, mirror_length)
 
+    # Draw ray
     draw_ray_path(ax, top_angle, bottom_angle, entry_height)
 
+    # Format axes
     ax.set_xlim(0, 800)
     ax.set_ylim(0, 600)
     ax.set_aspect("equal", adjustable="box")
     ax.axis("off")
 
+    # Render in Streamlit and close figure (important on Streamlit Cloud)
     st.pyplot(fig)
+    plt.close(fig)
 
 
 if __name__ == "__main__":
